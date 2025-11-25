@@ -22,12 +22,27 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "Stdbool.h"
+#include "Stdint.h"
+
 char ButtonState;
 char state=0;
 char moveleft=0;
 char moveright=0;
 char moveup=0;
 char movedown=0;
+
+typedef enum
+{
+	BUTTON_UP=0,
+	BUTTON_DOWN,
+	BUTTON_LEFT,
+	BUTTON_RIGHT,
+	BUTTON_COUNT
+};
+
+uint8_t buttonState[BUTTON_COUNT] = {0};
+uint8_t debounceCounter[BUTTON_COUNT] = {0};
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -47,6 +62,7 @@ char movedown=0;
 
 /* Private variables ---------------------------------------------------------*/
 ADC_HandleTypeDef hadc1;
+ADC_HandleTypeDef hadc2;
 
 COMP_HandleTypeDef hcomp2;
 COMP_HandleTypeDef hcomp3;
@@ -95,9 +111,11 @@ static void MX_DAC3_Init(void);
 static void MX_HRTIM1_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_USB_PCD_Init(void);
+static void MX_ADC2_Init(void);
 void StartDefaultTask(void *argument);
 void StartTask02(void *argument);
 
+static void MX_NVIC_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -147,6 +165,10 @@ int main(void)
   MX_HRTIM1_Init();
   MX_USART3_UART_Init();
   MX_USB_PCD_Init();
+  MX_ADC2_Init();
+
+  /* Initialize interrupts */
+  MX_NVIC_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
@@ -249,6 +271,17 @@ void SystemClock_Config(void)
 }
 
 /**
+  * @brief NVIC Configuration.
+  * @retval None
+  */
+static void MX_NVIC_Init(void)
+{
+  /* ADC1_2_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(ADC1_2_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(ADC1_2_IRQn);
+}
+
+/**
   * @brief ADC1 Initialization Function
   * @param None
   * @retval None
@@ -313,6 +346,74 @@ static void MX_ADC1_Init(void)
   /* USER CODE BEGIN ADC1_Init 2 */
 
   /* USER CODE END ADC1_Init 2 */
+
+}
+
+/**
+  * @brief ADC2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_ADC2_Init(void)
+{
+
+  /* USER CODE BEGIN ADC2_Init 0 */
+
+  /* USER CODE END ADC2_Init 0 */
+
+  ADC_ChannelConfTypeDef sConfig = {0};
+
+  /* USER CODE BEGIN ADC2_Init 1 */
+
+  /* USER CODE END ADC2_Init 1 */
+
+  /** Common config
+  */
+  hadc2.Instance = ADC2;
+  hadc2.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV4;
+  hadc2.Init.Resolution = ADC_RESOLUTION_12B;
+  hadc2.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+  hadc2.Init.GainCompensation = 0;
+  hadc2.Init.ScanConvMode = ADC_SCAN_ENABLE;
+  hadc2.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
+  hadc2.Init.LowPowerAutoWait = DISABLE;
+  hadc2.Init.ContinuousConvMode = DISABLE;
+  hadc2.Init.NbrOfConversion = 2;
+  hadc2.Init.DiscontinuousConvMode = DISABLE;
+  hadc2.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+  hadc2.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
+  hadc2.Init.DMAContinuousRequests = DISABLE;
+  hadc2.Init.Overrun = ADC_OVR_DATA_PRESERVED;
+  hadc2.Init.OversamplingMode = DISABLE;
+  if (HAL_ADC_Init(&hadc2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_3;
+  sConfig.Rank = ADC_REGULAR_RANK_1;
+  sConfig.SamplingTime = ADC_SAMPLETIME_2CYCLES_5;
+  sConfig.SingleDiff = ADC_SINGLE_ENDED;
+  sConfig.OffsetNumber = ADC_OFFSET_NONE;
+  sConfig.Offset = 0;
+  if (HAL_ADC_ConfigChannel(&hadc2, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_13;
+  sConfig.Rank = ADC_REGULAR_RANK_2;
+  if (HAL_ADC_ConfigChannel(&hadc2, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN ADC2_Init 2 */
+
+  /* USER CODE END ADC2_Init 2 */
 
 }
 
@@ -1048,7 +1149,7 @@ void StartDefaultTask(void *argument)
 		  		  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0, 0);
 		  		  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_1, 0);
 	 	  	  }
-    osDelay(1);
+    osDelay(5);
   }
   /* USER CODE END 5 */
 }
@@ -1067,8 +1168,11 @@ void StartTask02(void *argument)
   for(;;)
   {
 	  if (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_13)==0) {
-
-	  		  HAL_Delay(500);
+		  debounceCounter[BUTTON_UP]++;
+		  if(debounceCounter[BUTTON_UP] == 4)
+		  {
+			// buttonState[BUTTON_UP] = TRUE;
+		  }
 	  		  if (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_13)==0) {
 
 	  	  	  			  state++;
@@ -1126,7 +1230,19 @@ void StartTask02(void *argument)
 	  	  	 		  	  	 	  	  	  	  	  	  {
 	  	  	 		  	  	 	  	   	   movedown=0;
 	  	  	 		  	  	 	  	  	  	  	  	  }
-    osDelay(1);
+
+	  	  	 		  	  	 	  	   HAL_ADC_Start(&hadc2);
+	  	  	 		  	  	 	  	   static uint32_t value1 = 0;
+									   static uint32_t value2 = 0;
+									   while(HAL_ADC_PollForConversion(&hadc2, 650000) != HAL_OK)
+									   {
+
+									   }
+									   value1 = HAL_ADC_GetValue(&hadc2);
+									   value2 = HAL_ADC_GetValue(&hadc2);
+
+
+    osDelay(10);
   }
   /* USER CODE END StartTask02 */
 }
