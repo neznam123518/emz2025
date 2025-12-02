@@ -25,12 +25,28 @@
 #include "Stdbool.h"
 #include "Stdint.h"
 
+#define FALSE 0
+#define TRUE 1
+#define Vref_mV 3300
+
+
+	  	  	 		  	  	 	  	   static uint32_t value1 = 0;
+									   static uint32_t value2 = 0;
+	  	  	 		  	  	 	  	   static uint32_t value1_conv = 0;
+									   static uint32_t value2_conv = 0;
+
+#define Position_L_R 2500
+#define Position_U_D 2700
+
+#define Hystersis 200
+
 char ButtonState;
 char state=0;
 char moveleft=0;
 char moveright=0;
 char moveup=0;
 char movedown=0;
+char PositioningPhase=FALSE;
 
 typedef enum
 {
@@ -43,6 +59,7 @@ typedef enum
 
 uint8_t buttonState[BUTTON_COUNT] = {0};
 uint8_t debounceCounter[BUTTON_COUNT] = {0};
+char  Message[]="Test";
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -61,17 +78,12 @@ uint8_t debounceCounter[BUTTON_COUNT] = {0};
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-ADC_HandleTypeDef hadc1;
 ADC_HandleTypeDef hadc2;
 
 COMP_HandleTypeDef hcomp2;
 COMP_HandleTypeDef hcomp3;
 COMP_HandleTypeDef hcomp4;
 COMP_HandleTypeDef hcomp6;
-
-DAC_HandleTypeDef hdac1;
-DAC_HandleTypeDef hdac2;
-DAC_HandleTypeDef hdac3;
 
 HRTIM_HandleTypeDef hhrtim1;
 
@@ -93,6 +105,13 @@ const osThreadAttr_t myTask02_attributes = {
   .priority = (osPriority_t) osPriorityLow,
   .stack_size = 128 * 4
 };
+/* Definitions for Position */
+osThreadId_t PositionHandle;
+const osThreadAttr_t Position_attributes = {
+  .name = "Position",
+  .priority = (osPriority_t) osPriorityLow,
+  .stack_size = 128 * 4
+};
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -100,24 +119,21 @@ const osThreadAttr_t myTask02_attributes = {
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_ADC1_Init(void);
 static void MX_COMP2_Init(void);
 static void MX_COMP3_Init(void);
 static void MX_COMP4_Init(void);
 static void MX_COMP6_Init(void);
-static void MX_DAC1_Init(void);
-static void MX_DAC2_Init(void);
-static void MX_DAC3_Init(void);
 static void MX_HRTIM1_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_USB_PCD_Init(void);
 static void MX_ADC2_Init(void);
 void StartDefaultTask(void *argument);
 void StartTask02(void *argument);
+void StartTask03(void *argument);
 
 static void MX_NVIC_Init(void);
 /* USER CODE BEGIN PFP */
-
+void StartADC(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -154,14 +170,10 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_ADC1_Init();
   MX_COMP2_Init();
   MX_COMP3_Init();
   MX_COMP4_Init();
   MX_COMP6_Init();
-  MX_DAC1_Init();
-  MX_DAC2_Init();
-  MX_DAC3_Init();
   MX_HRTIM1_Init();
   MX_USART3_UART_Init();
   MX_USB_PCD_Init();
@@ -170,7 +182,8 @@ int main(void)
   /* Initialize interrupts */
   MX_NVIC_Init();
   /* USER CODE BEGIN 2 */
-
+HAL_ADCEx_Calibration_Start(&hadc2, ADC_SINGLE_ENDED);
+HAL_UART_Transmit(&huart3, (uint8_t *) Message, strlen(Message), 10);
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -198,6 +211,9 @@ int main(void)
 
   /* creation of myTask02 */
   myTask02Handle = osThreadNew(StartTask02, NULL, &myTask02_attributes);
+
+  /* creation of Position */
+  PositionHandle = osThreadNew(StartTask03, NULL, &Position_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -282,74 +298,6 @@ static void MX_NVIC_Init(void)
 }
 
 /**
-  * @brief ADC1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_ADC1_Init(void)
-{
-
-  /* USER CODE BEGIN ADC1_Init 0 */
-
-  /* USER CODE END ADC1_Init 0 */
-
-  ADC_MultiModeTypeDef multimode = {0};
-  ADC_ChannelConfTypeDef sConfig = {0};
-
-  /* USER CODE BEGIN ADC1_Init 1 */
-
-  /* USER CODE END ADC1_Init 1 */
-
-  /** Common config
-  */
-  hadc1.Instance = ADC1;
-  hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV4;
-  hadc1.Init.Resolution = ADC_RESOLUTION_12B;
-  hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
-  hadc1.Init.GainCompensation = 0;
-  hadc1.Init.ScanConvMode = ADC_SCAN_DISABLE;
-  hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
-  hadc1.Init.LowPowerAutoWait = DISABLE;
-  hadc1.Init.ContinuousConvMode = DISABLE;
-  hadc1.Init.NbrOfConversion = 1;
-  hadc1.Init.DiscontinuousConvMode = DISABLE;
-  hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
-  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
-  hadc1.Init.DMAContinuousRequests = DISABLE;
-  hadc1.Init.Overrun = ADC_OVR_DATA_PRESERVED;
-  hadc1.Init.OversamplingMode = DISABLE;
-  if (HAL_ADC_Init(&hadc1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  /** Configure the ADC multi-mode
-  */
-  multimode.Mode = ADC_MODE_INDEPENDENT;
-  if (HAL_ADCEx_MultiModeConfigChannel(&hadc1, &multimode) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  /** Configure Regular Channel
-  */
-  sConfig.Channel = ADC_CHANNEL_8;
-  sConfig.Rank = ADC_REGULAR_RANK_1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_2CYCLES_5;
-  sConfig.SingleDiff = ADC_SINGLE_ENDED;
-  sConfig.OffsetNumber = ADC_OFFSET_NONE;
-  sConfig.Offset = 0;
-  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN ADC1_Init 2 */
-
-  /* USER CODE END ADC1_Init 2 */
-
-}
-
-/**
   * @brief ADC2 Initialization Function
   * @param None
   * @retval None
@@ -370,7 +318,7 @@ static void MX_ADC2_Init(void)
   /** Common config
   */
   hadc2.Instance = ADC2;
-  hadc2.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV4;
+  hadc2.Init.ClockPrescaler = ADC_CLOCK_ASYNC_DIV16;
   hadc2.Init.Resolution = ADC_RESOLUTION_12B;
   hadc2.Init.DataAlign = ADC_DATAALIGN_RIGHT;
   hadc2.Init.GainCompensation = 0;
@@ -394,7 +342,7 @@ static void MX_ADC2_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_3;
   sConfig.Rank = ADC_REGULAR_RANK_1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_2CYCLES_5;
+  sConfig.SamplingTime = ADC_SAMPLETIME_640CYCLES_5;
   sConfig.SingleDiff = ADC_SINGLE_ENDED;
   sConfig.OffsetNumber = ADC_OFFSET_NONE;
   sConfig.Offset = 0;
@@ -434,7 +382,7 @@ static void MX_COMP2_Init(void)
   /* USER CODE END COMP2_Init 1 */
   hcomp2.Instance = COMP2;
   hcomp2.Init.InputPlus = COMP_INPUT_PLUS_IO1;
-  hcomp2.Init.InputMinus = COMP_INPUT_MINUS_DAC3_CH2;
+  hcomp2.Init.InputMinus = COMP_INPUT_MINUS_1_4VREFINT;
   hcomp2.Init.OutputPol = COMP_OUTPUTPOL_NONINVERTED;
   hcomp2.Init.Hysteresis = COMP_HYSTERESIS_NONE;
   hcomp2.Init.BlankingSrce = COMP_BLANKINGSRC_NONE;
@@ -466,7 +414,7 @@ static void MX_COMP3_Init(void)
   /* USER CODE END COMP3_Init 1 */
   hcomp3.Instance = COMP3;
   hcomp3.Init.InputPlus = COMP_INPUT_PLUS_IO1;
-  hcomp3.Init.InputMinus = COMP_INPUT_MINUS_DAC3_CH1;
+  hcomp3.Init.InputMinus = COMP_INPUT_MINUS_1_4VREFINT;
   hcomp3.Init.OutputPol = COMP_OUTPUTPOL_NONINVERTED;
   hcomp3.Init.Hysteresis = COMP_HYSTERESIS_NONE;
   hcomp3.Init.BlankingSrce = COMP_BLANKINGSRC_NONE;
@@ -498,7 +446,7 @@ static void MX_COMP4_Init(void)
   /* USER CODE END COMP4_Init 1 */
   hcomp4.Instance = COMP4;
   hcomp4.Init.InputPlus = COMP_INPUT_PLUS_IO1;
-  hcomp4.Init.InputMinus = COMP_INPUT_MINUS_DAC1_CH1;
+  hcomp4.Init.InputMinus = COMP_INPUT_MINUS_1_4VREFINT;
   hcomp4.Init.OutputPol = COMP_OUTPUTPOL_NONINVERTED;
   hcomp4.Init.Hysteresis = COMP_HYSTERESIS_NONE;
   hcomp4.Init.BlankingSrce = COMP_BLANKINGSRC_NONE;
@@ -530,7 +478,7 @@ static void MX_COMP6_Init(void)
   /* USER CODE END COMP6_Init 1 */
   hcomp6.Instance = COMP6;
   hcomp6.Init.InputPlus = COMP_INPUT_PLUS_IO1;
-  hcomp6.Init.InputMinus = COMP_INPUT_MINUS_DAC2_CH1;
+  hcomp6.Init.InputMinus = COMP_INPUT_MINUS_1_4VREFINT;
   hcomp6.Init.OutputPol = COMP_OUTPUTPOL_NONINVERTED;
   hcomp6.Init.Hysteresis = COMP_HYSTERESIS_NONE;
   hcomp6.Init.BlankingSrce = COMP_BLANKINGSRC_NONE;
@@ -542,154 +490,6 @@ static void MX_COMP6_Init(void)
   /* USER CODE BEGIN COMP6_Init 2 */
 
   /* USER CODE END COMP6_Init 2 */
-
-}
-
-/**
-  * @brief DAC1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_DAC1_Init(void)
-{
-
-  /* USER CODE BEGIN DAC1_Init 0 */
-
-  /* USER CODE END DAC1_Init 0 */
-
-  DAC_ChannelConfTypeDef sConfig = {0};
-
-  /* USER CODE BEGIN DAC1_Init 1 */
-
-  /* USER CODE END DAC1_Init 1 */
-
-  /** DAC Initialization
-  */
-  hdac1.Instance = DAC1;
-  if (HAL_DAC_Init(&hdac1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  /** DAC channel OUT1 config
-  */
-  sConfig.DAC_HighFrequency = DAC_HIGH_FREQUENCY_INTERFACE_MODE_AUTOMATIC;
-  sConfig.DAC_DMADoubleDataMode = DISABLE;
-  sConfig.DAC_SignedFormat = DISABLE;
-  sConfig.DAC_SampleAndHold = DAC_SAMPLEANDHOLD_DISABLE;
-  sConfig.DAC_Trigger = DAC_TRIGGER_NONE;
-  sConfig.DAC_Trigger2 = DAC_TRIGGER_NONE;
-  sConfig.DAC_OutputBuffer = DAC_OUTPUTBUFFER_DISABLE;
-  sConfig.DAC_ConnectOnChipPeripheral = DAC_CHIPCONNECT_INTERNAL;
-  sConfig.DAC_UserTrimming = DAC_TRIMMING_FACTORY;
-  if (HAL_DAC_ConfigChannel(&hdac1, &sConfig, DAC_CHANNEL_1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN DAC1_Init 2 */
-
-  /* USER CODE END DAC1_Init 2 */
-
-}
-
-/**
-  * @brief DAC2 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_DAC2_Init(void)
-{
-
-  /* USER CODE BEGIN DAC2_Init 0 */
-
-  /* USER CODE END DAC2_Init 0 */
-
-  DAC_ChannelConfTypeDef sConfig = {0};
-
-  /* USER CODE BEGIN DAC2_Init 1 */
-
-  /* USER CODE END DAC2_Init 1 */
-
-  /** DAC Initialization
-  */
-  hdac2.Instance = DAC2;
-  if (HAL_DAC_Init(&hdac2) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  /** DAC channel OUT1 config
-  */
-  sConfig.DAC_HighFrequency = DAC_HIGH_FREQUENCY_INTERFACE_MODE_AUTOMATIC;
-  sConfig.DAC_DMADoubleDataMode = DISABLE;
-  sConfig.DAC_SignedFormat = DISABLE;
-  sConfig.DAC_SampleAndHold = DAC_SAMPLEANDHOLD_DISABLE;
-  sConfig.DAC_Trigger = DAC_TRIGGER_NONE;
-  sConfig.DAC_Trigger2 = DAC_TRIGGER_NONE;
-  sConfig.DAC_OutputBuffer = DAC_OUTPUTBUFFER_DISABLE;
-  sConfig.DAC_ConnectOnChipPeripheral = DAC_CHIPCONNECT_INTERNAL;
-  sConfig.DAC_UserTrimming = DAC_TRIMMING_FACTORY;
-  if (HAL_DAC_ConfigChannel(&hdac2, &sConfig, DAC_CHANNEL_1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN DAC2_Init 2 */
-
-  /* USER CODE END DAC2_Init 2 */
-
-}
-
-/**
-  * @brief DAC3 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_DAC3_Init(void)
-{
-
-  /* USER CODE BEGIN DAC3_Init 0 */
-
-  /* USER CODE END DAC3_Init 0 */
-
-  DAC_ChannelConfTypeDef sConfig = {0};
-
-  /* USER CODE BEGIN DAC3_Init 1 */
-
-  /* USER CODE END DAC3_Init 1 */
-
-  /** DAC Initialization
-  */
-  hdac3.Instance = DAC3;
-  if (HAL_DAC_Init(&hdac3) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  /** DAC channel OUT1 config
-  */
-  sConfig.DAC_HighFrequency = DAC_HIGH_FREQUENCY_INTERFACE_MODE_AUTOMATIC;
-  sConfig.DAC_DMADoubleDataMode = DISABLE;
-  sConfig.DAC_SignedFormat = DISABLE;
-  sConfig.DAC_SampleAndHold = DAC_SAMPLEANDHOLD_DISABLE;
-  sConfig.DAC_Trigger = DAC_TRIGGER_NONE;
-  sConfig.DAC_Trigger2 = DAC_TRIGGER_NONE;
-  sConfig.DAC_OutputBuffer = DAC_OUTPUTBUFFER_DISABLE;
-  sConfig.DAC_ConnectOnChipPeripheral = DAC_CHIPCONNECT_INTERNAL;
-  sConfig.DAC_UserTrimming = DAC_TRIMMING_FACTORY;
-  if (HAL_DAC_ConfigChannel(&hdac3, &sConfig, DAC_CHANNEL_1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  /** DAC channel OUT2 config
-  */
-  if (HAL_DAC_ConfigChannel(&hdac3, &sConfig, DAC_CHANNEL_2) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN DAC3_Init 2 */
-
-  /* USER CODE END DAC3_Init 2 */
 
 }
 
@@ -1004,6 +804,18 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOF, &GPIO_InitStruct);
 
+  /*Configure GPIO pin : USBPD_VIN_Pin */
+  GPIO_InitStruct.Pin = USBPD_VIN_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(USBPD_VIN_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : BUCKBOOST_VIN_Pin BUCKBOOST_I_IN_AVG_Pin BUCKBOOST_VOUT_Pin */
+  GPIO_InitStruct.Pin = BUCKBOOST_VIN_Pin|BUCKBOOST_I_IN_AVG_Pin|BUCKBOOST_VOUT_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
   /*Configure GPIO pins : PA4 LD2_Pin */
   GPIO_InitStruct.Pin = GPIO_PIN_4|LD2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
@@ -1057,7 +869,23 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+void StartADC(void)
+{
+			HAL_ADC_Start(&hadc2);
+			   while(HAL_ADC_PollForConversion(&hadc2, 650000) != HAL_OK)
+			  {
 
+			  }
+			   value1 = HAL_ADC_GetValue(&hadc2);
+			   value1_conv= __HAL_ADC_CALC_DATA_TO_VOLTAGE(Vref_mV,value1,ADC_RESOLUTION_12B);
+			   HAL_ADC_Start(&hadc2);
+			   while(HAL_ADC_PollForConversion(&hadc2, 650000) != HAL_OK)
+			  {
+
+			  }
+			   value2 = HAL_ADC_GetValue(&hadc2);
+			   value2_conv= __HAL_ADC_CALC_DATA_TO_VOLTAGE(Vref_mV,value2,ADC_RESOLUTION_12B);
+}
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_StartDefaultTask */
@@ -1231,20 +1059,89 @@ void StartTask02(void *argument)
 	  	  	 		  	  	 	  	   	   movedown=0;
 	  	  	 		  	  	 	  	  	  	  	  	  }
 
-	  	  	 		  	  	 	  	   HAL_ADC_Start(&hadc2);
-	  	  	 		  	  	 	  	   static uint32_t value1 = 0;
-									   static uint32_t value2 = 0;
-									   while(HAL_ADC_PollForConversion(&hadc2, 650000) != HAL_OK)
-									   {
-
-									   }
-									   value1 = HAL_ADC_GetValue(&hadc2);
-									   value2 = HAL_ADC_GetValue(&hadc2);
+									   StartADC();
 
 
     osDelay(10);
   }
   /* USER CODE END StartTask02 */
+}
+
+/* USER CODE BEGIN Header_StartTask03 */
+/**
+* @brief Function implementing the Position thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartTask03 */
+void StartTask03(void *argument)
+{
+  /* USER CODE BEGIN StartTask03 */
+  /* Infinite loop */
+  for(;;)
+  {
+	  if(PositioningPhase==TRUE)
+	  {
+
+		  while(value2_conv>(Position_L_R+Hystersis) || value2_conv<(Position_L_R-Hystersis) )
+		  {
+			  StartADC();
+			  if(value2_conv>Position_L_R)
+			  {
+				  HAL_GPIO_WritePin(GPIOF, GPIO_PIN_0, 0);
+				  HAL_GPIO_WritePin(GPIOF, GPIO_PIN_1, 1);
+				  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0, 0);
+				  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_1, 1);
+			  }
+			  else if(value2_conv<Position_L_R)
+			  {
+				  HAL_GPIO_WritePin(GPIOF, GPIO_PIN_0, 1);
+				  		  HAL_GPIO_WritePin(GPIOF, GPIO_PIN_1, 0);
+				  		  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0, 1);
+				  		  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_1, 1);
+			  }
+			  else
+			  {
+				  	  	  HAL_GPIO_WritePin(GPIOF, GPIO_PIN_0, 0);
+				  		  HAL_GPIO_WritePin(GPIOF, GPIO_PIN_1, 0);
+				  		  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0, 0);
+				  		  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_1, 0);
+			  }
+
+
+		  }
+
+		  while(value1_conv>(Position_U_D+Hystersis) || value2_conv<(Position_U_D-Hystersis) )
+		  {
+			  StartADC();
+			  if(value1_conv>Position_U_D)
+			  			  {
+				  	  	  	  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9, 1);
+				  	 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, 0);
+				  	 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, 1);
+				  	 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, 1);
+			  			  }
+			  			  else if(value1_conv<Position_U_D)
+			  			  {
+			  		 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9, 1);
+			  		 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, 0);
+			  		 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, 1);
+			  		 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, 0);
+			  			  }
+			  			  else
+								{
+			  		 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9, 0);
+			  		 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, 0);
+			  		 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, 0);
+			  		 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, 0);
+								}
+
+		  }
+		  PositioningPhase=FALSE;
+	  }
+    osDelay(1);
+  }
+  /* USER CODE END StartTask03 */
 }
 
 /**
