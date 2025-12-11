@@ -61,15 +61,21 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
-#define JOYSTICK_SEL_Pin GPIO_PIN_13
-#define JOYSTICK_SEL_GPIO_Port GPIOC
-#define JOYSTICK_SEL_EXTI_IRQn EXTI15_10_IRQn
+#define Button_OK_Pin GPIO_PIN_13
+#define Button_OK_GPIO_Port GPIOC
+#define Button_OK_EXTI_IRQn EXTI15_10_IRQn
 #define BUCKBOOST_LOAD_1_Pin GPIO_PIN_14
 #define BUCKBOOST_LOAD_1_GPIO_Port GPIOC
 #define BUCKBOOST_LOAD_2_Pin GPIO_PIN_15
 #define BUCKBOOST_LOAD_2_GPIO_Port GPIOC
-#define BTN_UP_Pin GPIO_PIN_0
-#define BTN_UP_GPIO_Port GPIOF
+#define Button_R_L_IN_A_Pin GPIO_PIN_0
+#define Button_R_L_IN_A_GPIO_Port GPIOF
+#define Button_R_L_IN_B_Pin GPIO_PIN_1
+#define Button_R_L_IN_B_GPIO_Port GPIOF
+#define Button_R_L_SEL_0_Pin GPIO_PIN_0
+#define Button_R_L_SEL_0_GPIO_Port GPIOC
+#define Button_R_L_PWM_Pin GPIO_PIN_1
+#define Button_R_L_PWM_GPIO_Port GPIOC
 #define USBPD_VIN_Pin GPIO_PIN_2
 #define USBPD_VIN_GPIO_Port GPIOC
 #define BUCKBOOST_USBPD_EN_Pin GPIO_PIN_3
@@ -82,32 +88,34 @@ void Error_Handler(void);
 #define BUCKBOOST_I_IN_AVG_GPIO_Port GPIOA
 #define BUCKBOOST_VOUT_Pin GPIO_PIN_3
 #define BUCKBOOST_VOUT_GPIO_Port GPIOA
+#define Button_LED_IN_B_Pin GPIO_PIN_4
+#define Button_LED_IN_B_GPIO_Port GPIOA
 #define BUCK_RED_SENSE_Pin GPIO_PIN_7
 #define BUCK_RED_SENSE_GPIO_Port GPIOA
-#define JOYSTICK_LEFT_Pin GPIO_PIN_4
-#define JOYSTICK_LEFT_GPIO_Port GPIOC
-#define JOYSTICK_LEFT_EXTI_IRQn EXTI4_IRQn
-#define JOYSTICK_DOWN_Pin GPIO_PIN_5
-#define JOYSTICK_DOWN_GPIO_Port GPIOC
-#define JOYSTICK_DOWN_EXTI_IRQn EXTI9_5_IRQn
+#define Button_LEFT_Pin GPIO_PIN_4
+#define Button_LEFT_GPIO_Port GPIOC
+#define Button_LEFT_EXTI_IRQn EXTI4_IRQn
+#define Button_DOWN_Pin GPIO_PIN_5
+#define Button_DOWN_GPIO_Port GPIOC
+#define Button_DOWN_EXTI_IRQn EXTI9_5_IRQn
 #define BUCK_BLUE_SENSE_Pin GPIO_PIN_0
 #define BUCK_BLUE_SENSE_GPIO_Port GPIOB
 #define LD3_Pin GPIO_PIN_1
 #define LD3_GPIO_Port GPIOB
-#define JOYSTICK_RIGHT_Pin GPIO_PIN_2
-#define JOYSTICK_RIGHT_GPIO_Port GPIOB
-#define JOYSTICK_RIGHT_EXTI_IRQn EXTI2_IRQn
-#define JOYSTICK_UP_Pin GPIO_PIN_10
-#define JOYSTICK_UP_GPIO_Port GPIOB
-#define JOYSTICK_UP_EXTI_IRQn EXTI15_10_IRQn
+#define Button_RIGHT_Pin GPIO_PIN_2
+#define Button_RIGHT_GPIO_Port GPIOB
+#define Button_RIGHT_EXTI_IRQn EXTI2_IRQn
+#define Button_UP_Pin GPIO_PIN_10
+#define Button_UP_GPIO_Port GPIOB
+#define Button_UP_EXTI_IRQn EXTI15_10_IRQn
 #define BUCKBOOST_I_IN_SENSE_Pin GPIO_PIN_11
 #define BUCKBOOST_I_IN_SENSE_GPIO_Port GPIOB
 #define BUCKBOOST_P1_DRIVE_Pin GPIO_PIN_12
 #define BUCKBOOST_P1_DRIVE_GPIO_Port GPIOB
 #define BUCKBOOST_N1_DRIVE_Pin GPIO_PIN_13
 #define BUCKBOOST_N1_DRIVE_GPIO_Port GPIOB
-#define BUCKBOOST_N2_DRIVE_Pin GPIO_PIN_14
-#define BUCKBOOST_N2_DRIVE_GPIO_Port GPIOB
+#define Button_Deadzone_Pin GPIO_PIN_14
+#define Button_Deadzone_GPIO_Port GPIOB
 #define BUCKBOOST_P2_DRIVE_Pin GPIO_PIN_15
 #define BUCKBOOST_P2_DRIVE_GPIO_Port GPIOB
 #define BUCK_RED_DRIVE_Pin GPIO_PIN_6
@@ -128,8 +136,14 @@ void Error_Handler(void);
 #define USBPD_1A_PROTECT_GPIO_Port GPIOC
 #define USBPD_550mA_PROTECT_Pin GPIO_PIN_2
 #define USBPD_550mA_PROTECT_GPIO_Port GPIOD
-#define LD5_Pin GPIO_PIN_5
-#define LD5_GPIO_Port GPIOB
+#define Button_U_D_PWM_Pin GPIO_PIN_5
+#define Button_U_D_PWM_GPIO_Port GPIOB
+#define Button_U_D_SEL_0_Pin GPIO_PIN_7
+#define Button_U_D_SEL_0_GPIO_Port GPIOB
+#define Button_U_D_IN_B_Pin GPIO_PIN_8
+#define Button_U_D_IN_B_GPIO_Port GPIOB
+#define Button_U_D_IN_A_Pin GPIO_PIN_9
+#define Button_U_D_IN_A_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 

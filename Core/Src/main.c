@@ -25,8 +25,8 @@
 #include "Stdbool.h"
 #include "Stdint.h"
 #include "string.h"
-#define FALSE 0
-#define TRUE 1
+#define False 0
+#define True 1
 #define Vref_mV 3300
 
 
@@ -46,19 +46,18 @@ char moveleft=0;
 char moveright=0;
 char moveup=0;
 char movedown=0;
-char PositioningPhase=FALSE;
+char PositioningPhase=False;
 
-typedef enum
-{
-	BUTTON_UP=0,
-	BUTTON_DOWN,
-	BUTTON_LEFT,
-	BUTTON_RIGHT,
-	BUTTON_COUNT
-};
+#define Button_UP 0
+#define Button_DOWN 1
+#define Button_LEFT 2
+#define Button_RIGHT 3
+#define Button_LED 4
+#define Button_LEDOFF 5
+#define Button_COUNT 6
 
-uint8_t buttonState[BUTTON_COUNT] = {0};
-uint8_t debounceCounter[BUTTON_COUNT] = {0};
+uint8_t buttonState[Button_COUNT] = {0};
+uint8_t debounceCounter[Button_COUNT] = {0};
 char  Message[]="Test";
 static void PWM_setduty(uint8_t channel, uint16_t dutycycle);
 /* USER CODE END Includes */
@@ -122,6 +121,13 @@ const osThreadAttr_t Task_5m_attributes = {
   .priority = (osPriority_t) osPriorityLow,
   .stack_size = 128 * 4
 };
+/* Definitions for myTask05 */
+osThreadId_t myTask05Handle;
+const osThreadAttr_t myTask05_attributes = {
+  .name = "myTask05",
+  .priority = (osPriority_t) osPriorityLow,
+  .stack_size = 128 * 4
+};
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -142,6 +148,7 @@ void StartDefaultTask(void *argument);
 void StartTask02(void *argument);
 void StartTask03(void *argument);
 void StartTask04(void *argument);
+void DeadZone(void *argument);
 
 static void MX_NVIC_Init(void);
 /* USER CODE BEGIN PFP */
@@ -231,6 +238,9 @@ HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_4);
 
   /* creation of Task_5m */
   Task_5mHandle = osThreadNew(StartTask04, NULL, &Task_5m_attributes);
+
+  /* creation of myTask05 */
+  myTask05Handle = osThreadNew(DeadZone, NULL, &myTask05_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -591,10 +601,6 @@ static void MX_HRTIM1_Init(void)
     Error_Handler();
   }
   pTimerCfg.DelayedProtectionMode = HRTIM_TIMER_D_E_DELAYEDPROTECTION_DISABLED;
-  if (HAL_HRTIM_WaveformTimerConfig(&hhrtim1, HRTIM_TIMERINDEX_TIMER_D, &pTimerCfg) != HAL_OK)
-  {
-    Error_Handler();
-  }
   if (HAL_HRTIM_WaveformTimerConfig(&hhrtim1, HRTIM_TIMERINDEX_TIMER_E, &pTimerCfg) != HAL_OK)
   {
     Error_Handler();
@@ -620,10 +626,6 @@ static void MX_HRTIM1_Init(void)
   {
     Error_Handler();
   }
-  if (HAL_HRTIM_WaveformOutputConfig(&hhrtim1, HRTIM_TIMERINDEX_TIMER_D, HRTIM_OUTPUT_TD1, &pOutputCfg) != HAL_OK)
-  {
-    Error_Handler();
-  }
   if (HAL_HRTIM_WaveformOutputConfig(&hhrtim1, HRTIM_TIMERINDEX_TIMER_E, HRTIM_OUTPUT_TE1, &pOutputCfg) != HAL_OK)
   {
     Error_Handler();
@@ -644,19 +646,7 @@ static void MX_HRTIM1_Init(void)
   {
     Error_Handler();
   }
-  if (HAL_HRTIM_WaveformOutputConfig(&hhrtim1, HRTIM_TIMERINDEX_TIMER_D, HRTIM_OUTPUT_TD2, &pOutputCfg) != HAL_OK)
-  {
-    Error_Handler();
-  }
   if (HAL_HRTIM_WaveformOutputConfig(&hhrtim1, HRTIM_TIMERINDEX_TIMER_F, HRTIM_OUTPUT_TF2, &pOutputCfg) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_HRTIM_TimeBaseConfig(&hhrtim1, HRTIM_TIMERINDEX_TIMER_D, &pTimeBaseCfg) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_HRTIM_WaveformTimerControl(&hhrtim1, HRTIM_TIMERINDEX_TIMER_D, &pTimerCtl) != HAL_OK)
   {
     Error_Handler();
   }
@@ -831,8 +821,8 @@ static void MX_USB_PCD_Init(void)
 static void MX_GPIO_Init(void)
 {
   GPIO_InitTypeDef GPIO_InitStruct = {0};
-/* USER CODE BEGIN MX_GPIO_Init_1 */
-/* USER CODE END MX_GPIO_Init_1 */
+  /* USER CODE BEGIN MX_GPIO_Init_1 */
+  /* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOC_CLK_ENABLE();
@@ -842,39 +832,39 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOD_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOC, BUCKBOOST_LOAD_1_Pin|BUCKBOOST_LOAD_2_Pin|GPIO_PIN_0|GPIO_PIN_1
+  HAL_GPIO_WritePin(GPIOC, BUCKBOOST_LOAD_1_Pin|BUCKBOOST_LOAD_2_Pin|Button_R_L_SEL_0_Pin|Button_R_L_PWM_Pin
                           |BUCKBOOST_USBPD_EN_Pin|USBPD_1A_PROTECT_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOF, BTN_UP_Pin|GPIO_PIN_1, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOF, Button_R_L_IN_A_Pin|Button_R_L_IN_B_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4|LD2_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, Button_LED_IN_B_Pin|LD2_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, LD3_Pin|LD5_Pin|GPIO_PIN_7|GPIO_PIN_8
-                          |GPIO_PIN_9, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, LD3_Pin|Button_U_D_PWM_Pin|Button_U_D_SEL_0_Pin|Button_U_D_IN_B_Pin
+                          |Button_U_D_IN_A_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(USBPD_550mA_PROTECT_GPIO_Port, USBPD_550mA_PROTECT_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : JOYSTICK_SEL_Pin JOYSTICK_LEFT_Pin JOYSTICK_DOWN_Pin */
-  GPIO_InitStruct.Pin = JOYSTICK_SEL_Pin|JOYSTICK_LEFT_Pin|JOYSTICK_DOWN_Pin;
+  /*Configure GPIO pins : Button_OK_Pin Button_LEFT_Pin Button_DOWN_Pin */
+  GPIO_InitStruct.Pin = Button_OK_Pin|Button_LEFT_Pin|Button_DOWN_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : BUCKBOOST_LOAD_1_Pin BUCKBOOST_LOAD_2_Pin PC0 PC1
+  /*Configure GPIO pins : BUCKBOOST_LOAD_1_Pin BUCKBOOST_LOAD_2_Pin Button_R_L_SEL_0_Pin Button_R_L_PWM_Pin
                            BUCKBOOST_USBPD_EN_Pin USBPD_1A_PROTECT_Pin */
-  GPIO_InitStruct.Pin = BUCKBOOST_LOAD_1_Pin|BUCKBOOST_LOAD_2_Pin|GPIO_PIN_0|GPIO_PIN_1
+  GPIO_InitStruct.Pin = BUCKBOOST_LOAD_1_Pin|BUCKBOOST_LOAD_2_Pin|Button_R_L_SEL_0_Pin|Button_R_L_PWM_Pin
                           |BUCKBOOST_USBPD_EN_Pin|USBPD_1A_PROTECT_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : BTN_UP_Pin PF1 */
-  GPIO_InitStruct.Pin = BTN_UP_Pin|GPIO_PIN_1;
+  /*Configure GPIO pins : Button_R_L_IN_A_Pin Button_R_L_IN_B_Pin */
+  GPIO_InitStruct.Pin = Button_R_L_IN_A_Pin|Button_R_L_IN_B_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -892,27 +882,33 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : PA4 LD2_Pin */
-  GPIO_InitStruct.Pin = GPIO_PIN_4|LD2_Pin;
+  /*Configure GPIO pins : Button_LED_IN_B_Pin LD2_Pin */
+  GPIO_InitStruct.Pin = Button_LED_IN_B_Pin|LD2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : LD3_Pin LD5_Pin PB7 PB8
-                           PB9 */
-  GPIO_InitStruct.Pin = LD3_Pin|LD5_Pin|GPIO_PIN_7|GPIO_PIN_8
-                          |GPIO_PIN_9;
+  /*Configure GPIO pins : LD3_Pin Button_U_D_PWM_Pin Button_U_D_SEL_0_Pin Button_U_D_IN_B_Pin
+                           Button_U_D_IN_A_Pin */
+  GPIO_InitStruct.Pin = LD3_Pin|Button_U_D_PWM_Pin|Button_U_D_SEL_0_Pin|Button_U_D_IN_B_Pin
+                          |Button_U_D_IN_A_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : JOYSTICK_RIGHT_Pin JOYSTICK_UP_Pin */
-  GPIO_InitStruct.Pin = JOYSTICK_RIGHT_Pin|JOYSTICK_UP_Pin;
+  /*Configure GPIO pins : Button_RIGHT_Pin Button_UP_Pin */
+  GPIO_InitStruct.Pin = Button_RIGHT_Pin|Button_UP_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : Button_Deadzone_Pin */
+  GPIO_InitStruct.Pin = Button_Deadzone_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(Button_Deadzone_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : USBPD_550mA_PROTECT_Pin */
   GPIO_InitStruct.Pin = USBPD_550mA_PROTECT_Pin;
@@ -940,8 +936,8 @@ static void MX_GPIO_Init(void)
   HAL_NVIC_SetPriority(EXTI15_10_IRQn, 5, 0);
   HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
-/* USER CODE BEGIN MX_GPIO_Init_2 */
-/* USER CODE END MX_GPIO_Init_2 */
+  /* USER CODE BEGIN MX_GPIO_Init_2 */
+  /* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
@@ -985,81 +981,70 @@ void StartDefaultTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
-	  switch (state) {
-	 	  	  	  case 0:
-	 	  	  		  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, 0);
-	 	  	  		  break;
-	 	  			case 1:
-	 	  				HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_4);
-	 	  				HAL_Delay(500);
-	 	  				break;
-	 	  			default:
-	 	  				HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, 0);
-	 	  				break;
-	 	  		}
-	  if(moveleft==1 && moveright==0 &&movedown==0&&moveup==0)
+
+	  if(buttonState[Button_LEFT]==1 && buttonState[Button_RIGHT]==0 &&buttonState[Button_DOWN]==0&&buttonState[Button_UP]==0)
 	  {
-		  HAL_GPIO_WritePin(GPIOF, GPIO_PIN_0, 1);
-		  HAL_GPIO_WritePin(GPIOF, GPIO_PIN_1, 0);
-		  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0, 1);
-		  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_1, 1);
+		  HAL_GPIO_WritePin(Button_R_L_IN_A_GPIO_Port, Button_R_L_IN_A_Pin, 1);
+		  HAL_GPIO_WritePin(Button_R_L_IN_B_GPIO_Port, Button_R_L_IN_B_Pin, 0);
+		  HAL_GPIO_WritePin(Button_R_L_SEL_0_GPIO_Port, Button_R_L_SEL_0_Pin, 1);
+		  HAL_GPIO_WritePin(Button_R_L_PWM_GPIO_Port, Button_R_L_PWM_Pin, 1);
 	  }
-	  else if(moveleft==0 && moveright==0)
+	  else if(buttonState[Button_LEFT]==0 && buttonState[Button_RIGHT]==0)
 	  {
-		  HAL_GPIO_WritePin(GPIOF, GPIO_PIN_0, 1);
-		  HAL_GPIO_WritePin(GPIOF, GPIO_PIN_1, 0);
-		  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0, 1);
-		  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_1, 0);
+		  HAL_GPIO_WritePin(Button_R_L_IN_A_GPIO_Port, Button_R_L_IN_A_Pin, 1);
+		  HAL_GPIO_WritePin(Button_R_L_IN_B_GPIO_Port, Button_R_L_IN_B_Pin, 0);
+		  HAL_GPIO_WritePin(Button_R_L_SEL_0_GPIO_Port, Button_R_L_SEL_0_Pin, 1);
+		  HAL_GPIO_WritePin(Button_R_L_PWM_GPIO_Port, Button_R_L_PWM_Pin, 0);
 	  }
-	  if(moveright==1&&moveleft==0&&movedown==0&&moveup==0)
+	  if(buttonState[Button_RIGHT]==1&&buttonState[Button_LEFT]==0&&buttonState[Button_DOWN]==0&&buttonState[Button_UP]==0)
 	  {
-		  HAL_GPIO_WritePin(GPIOF, GPIO_PIN_0, 0);
-		  HAL_GPIO_WritePin(GPIOF, GPIO_PIN_1, 1);
-		  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0, 0);
-		  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_1, 1);
+		  HAL_GPIO_WritePin(Button_R_L_IN_A_GPIO_Port, Button_R_L_IN_A_Pin, 0);
+		  HAL_GPIO_WritePin(Button_R_L_IN_B_GPIO_Port, Button_R_L_IN_B_Pin, 1);
+		  HAL_GPIO_WritePin(Button_R_L_SEL_0_GPIO_Port, Button_R_L_SEL_0_Pin, 0);
+		  HAL_GPIO_WritePin(Button_R_L_PWM_GPIO_Port, Button_R_L_PWM_Pin, 1);
 	  }
-	  else if(moveright==0&&moveleft==0)
+	  else if(buttonState[Button_RIGHT]==0&&buttonState[Button_LEFT]==0)
 	  	  {
-	  		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9, 0);
-	  		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, 0);
-	  		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, 0);
-	  		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, 0);
-  		  HAL_GPIO_WritePin(GPIOF, GPIO_PIN_0, 0);
-  		  HAL_GPIO_WritePin(GPIOF, GPIO_PIN_1, 0);
-  		  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0, 0);
-  		  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_1, 0);
+	  		  HAL_GPIO_WritePin(Button_U_D_IN_A_GPIO_Port, Button_U_D_IN_A_Pin, 0);
+	  		  HAL_GPIO_WritePin(Button_U_D_IN_B_GPIO_Port, Button_U_D_IN_B_Pin, 0);
+	  		  HAL_GPIO_WritePin(Button_U_D_SEL_0_GPIO_Port, Button_U_D_SEL_0_Pin, 0);
+	  		  HAL_GPIO_WritePin(Button_U_D_PWM_GPIO_Port, Button_U_D_PWM_Pin, 0);
+	  		  HAL_GPIO_WritePin(Button_R_L_IN_A_GPIO_Port, Button_R_L_IN_A_Pin, 0);
+	  		  HAL_GPIO_WritePin(Button_R_L_IN_B_GPIO_Port, Button_R_L_IN_B_Pin, 0);
+	  		  HAL_GPIO_WritePin(Button_R_L_SEL_0_GPIO_Port, Button_R_L_SEL_0_Pin, 0);
+	  		  HAL_GPIO_WritePin(Button_R_L_PWM_GPIO_Port, Button_R_L_PWM_Pin, 0);
 	  	  }
-	  if(moveup==1 && movedown==0 && moveright==0&&moveleft==0)
+	  if(buttonState[Button_UP]==1 && buttonState[Button_DOWN]==0 && buttonState[Button_RIGHT]==0&&buttonState[Button_LEFT]==0)
 	 	  {
-	 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9, 1);
-	 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, 0);
-	 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, 1);
-	 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, 1);
+	 		  HAL_GPIO_WritePin(Button_U_D_IN_A_GPIO_Port, Button_U_D_IN_A_Pin, 1);
+	 		  HAL_GPIO_WritePin(Button_U_D_IN_B_GPIO_Port, Button_U_D_IN_B_Pin, 0);
+	 		  HAL_GPIO_WritePin(Button_U_D_SEL_0_GPIO_Port, Button_U_D_SEL_0_Pin, 1);
+	 		  HAL_GPIO_WritePin(Button_U_D_PWM_GPIO_Port, Button_U_D_PWM_Pin, 1);
 	 	  }
-	 	  else if(moveup==0 && movedown==0&& moveright==0&&moveleft==0)
+	 	  else if(buttonState[Button_UP]==0 && buttonState[Button_DOWN]==0&& buttonState[Button_RIGHT]==0&&buttonState[Button_LEFT]==0)
 	 	  {
-	 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9, 1);
-	 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, 0);
-	 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, 1);
-	 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, 0);
+	 		  HAL_GPIO_WritePin(Button_U_D_IN_A_GPIO_Port, Button_U_D_IN_A_Pin, 1);
+	 		  HAL_GPIO_WritePin(Button_U_D_IN_B_GPIO_Port, Button_U_D_IN_B_Pin, 0);
+	 		  HAL_GPIO_WritePin(Button_U_D_SEL_0_GPIO_Port, Button_U_D_SEL_0_Pin, 1);
+	 		  HAL_GPIO_WritePin(Button_U_D_PWM_GPIO_Port, Button_U_D_PWM_Pin, 0);
 	 	  }
-	 	  if(movedown==1&&moveup==0 && moveright==0&&moveleft==0)
+	 	  if(buttonState[Button_DOWN]==1&&buttonState[Button_UP]==0 && buttonState[Button_RIGHT]==0&&buttonState[Button_LEFT]==0)
 	 	  {
-	 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9, 0);
-	 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, 1);
-	 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, 0);
-	 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, 1);
+	 		  HAL_GPIO_WritePin(Button_U_D_IN_A_GPIO_Port, Button_U_D_IN_A_Pin, 0);
+	 		  HAL_GPIO_WritePin(Button_U_D_IN_B_GPIO_Port, Button_U_D_IN_B_Pin, 1);
+	 		  HAL_GPIO_WritePin(Button_U_D_SEL_0_GPIO_Port, Button_U_D_SEL_0_Pin, 0);
+	 		  HAL_GPIO_WritePin(Button_U_D_PWM_GPIO_Port, Button_U_D_PWM_Pin, 1);
 	 	  }
-	 	  else if(movedown==0&&moveup==0&& moveright==0&&moveleft==0)
+	 	  else if(buttonState[Button_DOWN]==0&&buttonState[Button_UP]==0&& buttonState[Button_RIGHT]==0&&buttonState[Button_LEFT]==0)
 	 	  	  {
-	 	  		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9, 0);
-	 	  		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, 0);
-	 	  		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, 0);
-	 	  		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, 0);
-		  		  HAL_GPIO_WritePin(GPIOF, GPIO_PIN_0, 0);
-		  		  HAL_GPIO_WritePin(GPIOF, GPIO_PIN_1, 0);
-		  		  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0, 0);
-		  		  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_1, 0);
+	 	  		  HAL_GPIO_WritePin(Button_U_D_IN_A_GPIO_Port, Button_U_D_IN_A_Pin, 0);
+	 	  		  HAL_GPIO_WritePin(Button_U_D_IN_B_GPIO_Port, Button_U_D_IN_B_Pin, 0);
+	 	  		  HAL_GPIO_WritePin(Button_U_D_SEL_0_GPIO_Port, Button_U_D_SEL_0_Pin, 0);
+	 	  		  HAL_GPIO_WritePin(Button_U_D_PWM_GPIO_Port, Button_U_D_PWM_Pin, 0);
+		  		  HAL_GPIO_WritePin(Button_R_L_IN_A_GPIO_Port, Button_R_L_IN_A_Pin, 0);
+		  		  HAL_GPIO_WritePin(Button_R_L_IN_B_GPIO_Port, Button_R_L_IN_B_Pin, 0);
+		  		  HAL_GPIO_WritePin(Button_R_L_SEL_0_GPIO_Port, Button_R_L_SEL_0_Pin, 0);
+		  		  HAL_GPIO_WritePin(Button_R_L_PWM_GPIO_Port, Button_R_L_PWM_Pin, 0);
 	 	  	  }
     osDelay(5);
   }
@@ -1079,71 +1064,88 @@ void StartTask02(void *argument)
   /* Infinite loop */
   for(;;)
   {
-	  if (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_13)==0) {
-		  debounceCounter[BUTTON_UP]++;
-		  if(debounceCounter[BUTTON_UP] == 4)
-		  {
-			// buttonState[BUTTON_UP] = TRUE;
-		  }
-	  		  if (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_13)==0) {
-
-	  	  	  			  state++;
+	  if(HAL_GPIO_ReadPin(Button_UP_GPIO_Port, Button_UP_Pin) == 0)
+	  	  {
+	  		  debounceCounter[Button_UP]++;
+	  		  if(debounceCounter[Button_UP] >= 5u)
+	  		  {
+	  			  debounceCounter[Button_UP] = 0;
+	  			  buttonState[Button_UP] = True;
 	  		  }
-	  	  	  	  }
-	  	  	  	  if(state>1)
+	  	  }
+	  	  else {
+	  		  debounceCounter[Button_UP] = 0;
+	  		  buttonState[Button_UP] = False;
+	  	  }
+	  	  if(HAL_GPIO_ReadPin(Button_DOWN_GPIO_Port, Button_DOWN_Pin) == 0)
+	  	  	  {
+	  	  		  debounceCounter[Button_DOWN]++;
+	  	  		  if(debounceCounter[Button_DOWN] >= 5u)
+	  	  		  {
+	  	  			  debounceCounter[Button_DOWN] = 0;
+	  	  			  buttonState[Button_DOWN] = True;
+	  	  		  }
+	  	  	  }
+	  	  	  else {
+	  	  		  debounceCounter[Button_DOWN] = 0;
+	  	  		  buttonState[Button_DOWN] = False;
+	  	  	  }
+	  	  if(HAL_GPIO_ReadPin(Button_RIGHT_GPIO_Port, Button_RIGHT_Pin) == 0)
+	  	  	  {
+	  	  		  debounceCounter[Button_RIGHT]++;
+	  	  		  if(debounceCounter[Button_RIGHT] >= 5u)
+	  	  		  {
+	  	  			  debounceCounter[Button_RIGHT] = 0;
+	  	  			  buttonState[Button_RIGHT] = True;
+	  	  		  }
+	  	  	  }
+	  	  	  else {
+	  	  		  debounceCounter[Button_RIGHT] = 0;
+	  	  		  buttonState[Button_RIGHT] = False;
+	  	  	  }
+	  	  if(HAL_GPIO_ReadPin(Button_LEFT_GPIO_Port, Button_LEFT_Pin) == 0)
+	  	  	  {
+	  	  		  debounceCounter[Button_LEFT]++;
+	  	  		  if(debounceCounter[Button_LEFT] >= 5u)
+	  	  		  {
+	  	  			  debounceCounter[Button_LEFT] = 0;
+	  	  			  buttonState[Button_LEFT] = True;
+	  	  		  }
+	  	  	  }
+	  	  	  else {
+	  	  		  debounceCounter[Button_LEFT] = 0;
+	  	  		  buttonState[Button_LEFT] = False;
+	  	  	  }
+	  	  if(HAL_GPIO_ReadPin(Button_OK_GPIO_Port, Button_OK_Pin) == 0)
 	  	  	  	  {
-	  	  	  		  state=0;
+	  	  	  		  debounceCounter[Button_LED]++;
+	  	  	  		  if(debounceCounter[Button_LED] >= 5u)
+	  	  	  		  {
+	  	  	  			  debounceCounter[Button_LED] = 0;
+	  	  	  			  buttonState[Button_LED] = True;
+	  	  	  		  }
 	  	  	  	  }
-	  	  	  if (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_4)==0) {
-
-	  	  	 	  		  HAL_Delay(500);
-	  	  	 	  		  if (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_4)==0) {
-
-	  	  	 	  	  	  			  moveleft=1;
-	  	  	 	  		  }
-	  	  	 	  	  	  	  }
-	  	  	  	  	  	  	  	  else
-	  	  	 	  	  	  	  {
-	  	  	  	  	  	  	  		  moveleft=0;
-	  	  	 	  	  	  	  }
-	  	  	 	  	   if (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_2)==0) {
-
-	  	  	 	  	  	  		  HAL_Delay(500);
-	  	  	 	  	  	  		  if (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_2)==0) {
-
-	  	  	 	  	  	  	  	  			  moveright=1;
-	  	  	 	  	  	  		  }
-	  	  	 	  	  	  	  	  	  }
-	  	  	 	  	   	   	   	   	  else
-	  	  	 	  	  	  	  	  	  {
-	  	  	 	  	  	  	  			moveright=0;
-	  	  	 	  	  	  	  	  	  }
-	  	  	 	  if (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_10)==0) {
-
-	  	  	 		  	  	 	  		  HAL_Delay(500);
-	  	  	 		  	  	 	  		  if (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_10)==0) {
-
-	  	  	 		  	  	 	  	  	  			  moveup=1;
-	  	  	 		  	  	 	  		  }
-	  	  	 		  	  	 	  	  	  	  }
-	  	  	 		  	  	  	  	  	  	  	  else
-	  	  	 		  	  	 	  	  	  	  {
-	  	  	 		  	  	  	  	  	moveup=0;
-	  	  	 		  	  	 	  	  	  	  }
-	  	  	 		  	  	 	  	   if (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_5)==0) {
-
-	  	  	 		  	  	 	  	  	  		  HAL_Delay(500);
-	  	  	 		  	  	 	  	  	  		  if (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_5)==0) {
-
-	  	  	 		  	  	 	  	  	  	  	  			  movedown=1;
-	  	  	 		  	  	 	  	  	  		  }
-	  	  	 		  	  	 	  	  	  	  	  	  }
-	  	  	 		  	  	 	  	   	   	   	   	  else
-	  	  	 		  	  	 	  	  	  	  	  	  {
-	  	  	 		  	  	 	  	   	   movedown=0;
-	  	  	 		  	  	 	  	  	  	  	  	  }
-
-									   StartADC();
+	  	  	  	  else {
+	  	  	  		  debounceCounter[Button_LED] = 0;
+	  	  	  		  buttonState[Button_LED] = False;
+	  	  	  	  }
+	  	  if(HAL_GPIO_ReadPin(Button_Deadzone_GPIO_Port, Button_Deadzone_Pin) == 1)
+	  	  	  	  {
+	  	  	  		  debounceCounter[Button_LEDOFF]++;
+	  	  	  		  if(debounceCounter[Button_LEDOFF] >= 50u)
+	  	  	  		  {
+	  	  	  			  debounceCounter[Button_LEDOFF] = 0;
+	  	  	  			  buttonState[Button_LEDOFF]++;
+	  	  	  			  if(buttonState[Button_LEDOFF]>=3)
+	  	  	  			  {
+	  	  	  				  buttonState[Button_LEDOFF]=0;
+	  	  	  			  }
+	  	  	  		  }
+	  	  	  	  }
+	  	  	  	  else {
+	  	  	  		  debounceCounter[Button_LEDOFF] = 0;
+	  	  	  	  }
+				StartADC();
 
 
     osDelay(10);
@@ -1164,7 +1166,7 @@ void StartTask03(void *argument)
   /* Infinite loop */
   for(;;)
   {
-	  if(PositioningPhase==TRUE)
+	  if(PositioningPhase==True)
 	  {
 
 		  while(value2_conv>(Position_L_R+Hystersis) || value2_conv<(Position_L_R-Hystersis) )
@@ -1172,24 +1174,24 @@ void StartTask03(void *argument)
 			  StartADC();
 			  if(value2_conv>Position_L_R)
 			  {
-				  HAL_GPIO_WritePin(GPIOF, GPIO_PIN_0, 0);
-				  HAL_GPIO_WritePin(GPIOF, GPIO_PIN_1, 1);
-				  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0, 0);
-				  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_1, 1);
+				  HAL_GPIO_WritePin(Button_R_L_IN_A_GPIO_Port, Button_R_L_IN_A_Pin, 0);
+				  HAL_GPIO_WritePin(Button_R_L_IN_B_GPIO_Port, Button_R_L_IN_B_Pin, 1);
+				  HAL_GPIO_WritePin(Button_R_L_SEL_0_GPIO_Port, Button_R_L_SEL_0_Pin, 0);
+				  HAL_GPIO_WritePin(Button_R_L_PWM_GPIO_Port, Button_R_L_PWM_Pin, 1);
 			  }
 			  else if(value2_conv<Position_L_R)
 			  {
-				  HAL_GPIO_WritePin(GPIOF, GPIO_PIN_0, 1);
-				  		  HAL_GPIO_WritePin(GPIOF, GPIO_PIN_1, 0);
-				  		  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0, 1);
-				  		  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_1, 1);
+				  HAL_GPIO_WritePin(Button_R_L_IN_A_GPIO_Port, Button_R_L_IN_A_Pin, 1);
+				  HAL_GPIO_WritePin(Button_R_L_IN_B_GPIO_Port, Button_R_L_IN_B_Pin, 0);
+				  HAL_GPIO_WritePin(Button_R_L_SEL_0_GPIO_Port, Button_R_L_SEL_0_Pin, 1);
+				  HAL_GPIO_WritePin(Button_R_L_PWM_GPIO_Port, Button_R_L_PWM_Pin, 1);
 			  }
 			  else
 			  {
-				  	  	  HAL_GPIO_WritePin(GPIOF, GPIO_PIN_0, 0);
-				  		  HAL_GPIO_WritePin(GPIOF, GPIO_PIN_1, 0);
-				  		  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0, 0);
-				  		  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_1, 0);
+				  HAL_GPIO_WritePin(Button_R_L_IN_A_GPIO_Port, Button_R_L_IN_A_Pin, 0);
+				  HAL_GPIO_WritePin(Button_R_L_IN_B_GPIO_Port, Button_R_L_IN_B_Pin, 0);
+				  HAL_GPIO_WritePin(Button_R_L_SEL_0_GPIO_Port, Button_R_L_SEL_0_Pin, 0);
+				  HAL_GPIO_WritePin(Button_R_L_PWM_GPIO_Port, Button_R_L_PWM_Pin, 0);
 			  }
 
 
@@ -1200,28 +1202,28 @@ void StartTask03(void *argument)
 			  StartADC();
 			  if(value1_conv>Position_U_D)
 			  			  {
-				  	  	  	  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9, 1);
-				  	 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, 0);
-				  	 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, 1);
-				  	 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, 1);
+				  	  	  	  HAL_GPIO_WritePin(Button_U_D_IN_A_GPIO_Port, Button_U_D_IN_A_Pin, 1);
+				  	 		  HAL_GPIO_WritePin(Button_U_D_IN_B_GPIO_Port, Button_U_D_IN_B_Pin, 0);
+				  	 		  HAL_GPIO_WritePin(Button_U_D_SEL_0_GPIO_Port, Button_U_D_SEL_0_Pin, 1);
+				  	 		  HAL_GPIO_WritePin(Button_U_D_PWM_GPIO_Port, Button_U_D_PWM_Pin, 1);
 			  			  }
 			  			  else if(value1_conv<Position_U_D)
 			  			  {
-			  		 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9, 1);
-			  		 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, 0);
-			  		 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, 1);
-			  		 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, 0);
+			  				  HAL_GPIO_WritePin(Button_U_D_IN_A_GPIO_Port, Button_U_D_IN_A_Pin, 1);
+			  				  HAL_GPIO_WritePin(Button_U_D_IN_B_GPIO_Port, Button_U_D_IN_B_Pin, 0);
+			  				  HAL_GPIO_WritePin(Button_U_D_SEL_0_GPIO_Port, Button_U_D_SEL_0_Pin, 1);
+				  	 		  HAL_GPIO_WritePin(Button_U_D_PWM_GPIO_Port, Button_U_D_PWM_Pin, 0);
 			  			  }
 			  			  else
 								{
-			  		 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9, 0);
-			  		 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, 0);
-			  		 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, 0);
-			  		 		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, 0);
+			  				  HAL_GPIO_WritePin(Button_U_D_IN_A_GPIO_Port, Button_U_D_IN_A_Pin, 0);
+			  				  HAL_GPIO_WritePin(Button_U_D_IN_B_GPIO_Port, Button_U_D_IN_B_Pin, 0);
+			  				  HAL_GPIO_WritePin(Button_U_D_SEL_0_GPIO_Port, Button_U_D_SEL_0_Pin, 0);
+				  	 		  HAL_GPIO_WritePin(Button_U_D_PWM_GPIO_Port, Button_U_D_PWM_Pin, 0);
 								}
 
 		  }
-		  PositioningPhase=FALSE;
+		  PositioningPhase=False;
 	  }
     osDelay(1);
   }
@@ -1241,9 +1243,51 @@ void StartTask04(void *argument)
   /* Infinite loop */
   for(;;)
   {
-    osDelay(5);
+	  switch (buttonState[Button_LED]) {
+	 	  	  	  case 0:
+	 	  	  		  HAL_GPIO_WritePin(Button_LED_IN_B_GPIO_Port, Button_LED_IN_B_Pin, 0);
+	 	  	  		  break;
+	 	  			case 1:
+	 	  				HAL_GPIO_TogglePin(Button_LED_IN_B_GPIO_Port, Button_LED_IN_B_Pin);
+	 	  				break;
+	 	  			default:
+	 	  				HAL_GPIO_WritePin(Button_LED_IN_B_GPIO_Port, Button_LED_IN_B_Pin, 0);
+	 	  				break;
+	 	  		}
+    osDelay(500);
   }
   /* USER CODE END StartTask04 */
+}
+
+/* USER CODE BEGIN Header_DeadZone */
+/**
+* @brief Function implementing the myTask05 thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_DeadZone */
+void DeadZone(void *argument)
+{
+  /* USER CODE BEGIN DeadZone */
+  /* Infinite loop */
+  for(;;)
+  {
+	  switch (buttonState[Button_LEDOFF]) {
+	  case 0:
+		  PWM_setduty(TIM_CHANNEL_4, 0);
+		  break;
+	  case 1:
+		  PWM_setduty(TIM_CHANNEL_4, 50);
+		  break;
+	  case 2:
+		  PWM_setduty(TIM_CHANNEL_4, 100);
+		  break;
+	  default:
+		 break;
+	  }
+    osDelay(5);
+  }
+  /* USER CODE END DeadZone */
 }
 
 /**
@@ -1259,7 +1303,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   /* USER CODE BEGIN Callback 0 */
 
   /* USER CODE END Callback 0 */
-  if (htim->Instance == TIM1) {
+  if (htim->Instance == TIM1)
+  {
     HAL_IncTick();
   }
   /* USER CODE BEGIN Callback 1 */
@@ -1281,8 +1326,7 @@ void Error_Handler(void)
   }
   /* USER CODE END Error_Handler_Debug */
 }
-
-#ifdef  USE_FULL_ASSERT
+#ifdef USE_FULL_ASSERT
 /**
   * @brief  Reports the name of the source file and the source line number
   *         where the assert_param error has occurred.
